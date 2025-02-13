@@ -1,2 +1,2 @@
-# mimetic_a_posteriori
+# Functional a posteriori error estimates for mimetic differences
 Functional a posteriori error estimates mimetic differences
