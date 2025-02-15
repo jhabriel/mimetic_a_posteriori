@@ -1,13 +1,17 @@
+graphics_toolkit("qt");
+
 % This code implements the Darcy problem with unit permeability using
 % a trigonometric manufactured solution satisfying zero-boundary conditions
 
 % Clear and add path
 clear all; clc; close all;
-% addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
-addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
+addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
+addpath('/Users/jvmini/Git/mimetic_a_posteriori/src')
+
+% addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
 
 % Input parameters
-ncells = 40;  % number of cells in x and y directions
+ncells = 20;  % number of cells in x and y directions
 k = 2;  % degree of the mimetic operator
 
 % True solution
@@ -80,39 +84,72 @@ error_q = norm(q_mimetic - q_exact) / norm(q_exact);
 disp('Error Pressure'); disp(error_p);
 disp('Error Flux'); disp(error_q);
 
-% Plot Numerical Pressure
-figure();
-surf(X, Y, reshape(p_mimetic, nx+2, ny+2));
-title(['Numerical pressure, k=', num2str(k)]);
-xlabel('x'); ylabel('y'); colorbar;
+#% Plot Numerical Pressure
+#figure();
+#surf(X, Y, reshape(p_mimetic, nx+2, ny+2));
+#title(['Numerical pressure, k=', num2str(k)]);
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#% Plot Exact Pressure
+#figure();
+#surf(X, Y, p(X, Y));
+#title('Exact pressure');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#% Plot Exact Vertical Fluxes
+#figure();
+#surf(Xdualh, Ydualh, qy(Xdualh, Ydualh));
+#title('Exact vertical fluxes');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#% Plot Numerical Vertical Fluxes
+#figure();
+#surf(Xdualh, Ydualh, reshape(qy_mimetic, ny+1, nx));
+#title('Numerical vertical fluxes');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#% Plot Exact Horizontal Fluxes
+#figure();
+#surf(Xdualv, Ydualv, qx(Xdualv, Ydualv));
+#title('Exact horizontal fluxes');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#% Plot Numerical Horizontal Fluxes
+#figure();
+#surf(Xdualv, Ydualv, reshape(qx_mimetic, ny, nx+1));
+#title('Numerical horizontal fluxes');
+#xlabel('x'); ylabel('y'); colorbar;
 
-% Plot Exact Pressure
-figure();
-surf(X, Y, p(X, Y));
-title('Exact pressure');
-xlabel('x'); ylabel('y'); colorbar;
 
-% Plot Exact Vertical Fluxes
-figure();
-surf(Xdualh, Ydualh, qy(Xdualh, Ydualh));
-title('Exact vertical fluxes');
-xlabel('x'); ylabel('y'); colorbar;
+# Testing interpolators
 
-% Plot Numerical Vertical Fluxes
-figure();
-surf(Xdualh, Ydualh, reshape(qy_mimetic, ny+1, nx));
-title('Numerical vertical fluxes');
-xlabel('x'); ylabel('y'); colorbar;
+# --> Center to faces interpolators
 
-% Plot Exact Horizontal Fluxes
-figure();
-surf(Xdualv, Ydualv, qx(Xdualv, Ydualv));
-title('Exact horizontal fluxes');
-xlabel('x'); ylabel('y'); colorbar;
+C2F = interpolCentersToFacesD2D(k, ncells, ncells);
+p_faces = C2F * [p_mimetic; p_mimetic];
+p_vertical_edges = p_faces(end/2+1:end);
+p_horizontal_edges = p_faces(1:end/2);
 
-% Plot Numerical Horizontal Fluxes
+# Pressure at the vertical edges
+#figure();
+#surf(Xdualv, Ydualv, reshape(p_vertical_edges, ny, nx+1));
+#title('Pressure at vertical edges')
+
+#figure();
+#surf(Xdualh, Ydualh, reshape(p_horizontal_edges, ny+1, nx));
+#title('Pressure at horizontal edges')
+
+# --> Center to nodes interpolators
+x_nodes = west:dx:east;
+y_nodes = south:dy:north;
+[X_nodes, Y_nodes] = meshgrid(x_nodes, y_nodes);
+C2N = interpolCentersToNodes2D(k, ncells, ncells);
+p_nodes = C2N * p_mimetic;
 figure();
-surf(Xdualv, Ydualv, reshape(qx_mimetic, ny, nx+1));
-title('Numerical horizontal fluxes');
-xlabel('x'); ylabel('y'); colorbar;
+surf(X_nodes, Y_nodes, reshape(p_nodes, nx+1, ny+1));
+
+
+
+
+
 

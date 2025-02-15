@@ -1,4 +1,4 @@
-function [error_p, error_q] = darcy_unit_perm_model(ncells, k)
+function [error_p, error_p_nodes] = darcy_unit_perm_model(ncells, k)
     % Model implementation of Darcy problem with unit permeability
 
     % addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
@@ -44,73 +44,65 @@ function [error_p, error_q] = darcy_unit_perm_model(ncells, k)
     RHS(:, end) = 0;
     RHS = reshape(RHS, [], 1);
 
-    % Solve linear system
+    % Solve linear system to obtain mimetic pressure
     p_mimetic = -L\RHS;
 
-    % Retrieve flux solution
+    % Retrieve mimetic flux solution
     G = grad2D(k, nx, dx, ny, dy);
     q_mimetic = - G * p_mimetic;
 
-    % Grid for vertical and horizontal fluxes
-    x_dual_grid_h = west + dx/2 : dx : east - dx/2;
-    y_dual_grid_h = south : dy : north;
-    [Xdualh, Ydualh] = meshgrid(x_dual_grid_h, y_dual_grid_h);
-    qy_mimetic = q_mimetic(1:length(q_mimetic)/2);
+    % Now, we separate between horizontal and vertical edges
+    %x_hori_edges = west + dx/2 : dx : east - dx/2;
+    %y_hori_edges = south : dy : north;
+    %[X_hori_edges, Y_hori_edges] = meshgrid(x_hori_edges, y_hori_edges);
+    %q_hori_edges = q_mimetic(1:end/2);
 
-    x_dual_grid_v = west : dx : east;
-    y_dual_grid_v = south + dy/2 : dy : north - dy/2;
-    [Xdualv, Ydualv] = meshgrid(x_dual_grid_v, y_dual_grid_v);
-    qx_mimetic = q_mimetic(length(q_mimetic)/2+1:end);
+    %x_vert_edges = west : dx : east;
+    %y_vert_edges = south + dy/2 : dy : north - dy/2;
+    %[X_vert_edges, Y_vert_edges] = meshgrid(x_vert_edges, y_vert_edges);
+    %q_vert_edges = q_mimetic(end/2+1:end);
 
-    % Exact values pressure and flux values
+    % Exact pressure and flux values
     p_exact = p(X, Y);
     p_exact = p_exact(:);
 
-    qx_exact = qx(Xdualv, Ydualv);
-    qx_exact = qx_exact(:);
-    qy_exact = qy(Xdualh, Ydualh);
-    qy_exact = qy_exact(:);
-    q_exact = [qy_exact; qx_exact];
+    %q_vert_edges_exact = qx(X_vert_edges, Y_vert_edges);  % vert edges, x-component
+    %q_vert_edges_exact = q_vert_edges_exact(:);
+    %q_hori_edges_exact = qy(X_hori_edges, X_hori_edges);  % hori edges, y-component
+    %q_hori_edges_exact = q_hori_edges_exact(:);
+    %q_exact = [q_vert_edges_exact; q_hori_edges_exact];   % [qx, qy] --> makes sense
 
     % Error computation
     error_p = norm(p_mimetic - p_exact) / norm(p_exact);
-    error_q = norm(q_mimetic - q_exact) / norm(q_exact);
+    %error_q = norm(q_mimetic - q_exact) / norm(q_exact);
     %disp('Error Pressure'); disp(error_p);
     %disp('Error Flux'); disp(error_q);
 
-    % Plot Numerical Pressure
-    % figure();
-    % surf(X, Y, reshape(p_mimetic, nx+2, ny+2));
-    % title(['Numerical pressure, k=', num2str(k)]);
-    % xlabel('x'); ylabel('y'); colorbar;
+    % Postprocessing
 
-    % Plot Exact Pressure
-    % figure();
-    % surf(X, Y, p(X, Y));
-    % title('Exact pressure');
-    % xlabel('x'); ylabel('y'); colorbar;
+    # --> Center to faces interpolators
+    %C2F = interpolCentersToFacesD2D(k, ncells, ncells);
+    %p_faces = C2F * [p_mimetic; p_mimetic];
+    %p_vert_edges = p_faces(1:end/2);
+    %p_hori_edges = p_faces(end/2+1:end);
 
-    % Plot Exact Vertical Fluxes
-    % figure();
-    % surf(Xdualh, Ydualh, qy(Xdualh, Ydualh));
-    % title('Exact vertical fluxes');
-    % xlabel('x'); ylabel('y'); colorbar;
+    # --> Center to nodes interpolators
+    x_nodes = west:dx:east;
+    y_nodes = south:dy:north;
+    [X_nodes, Y_nodes] = meshgrid(x_nodes, y_nodes);
+    C2N = interpolCentersToNodes2D(k, ncells, ncells);
+    p_nodes_mimetic = C2N * p_mimetic;
+    p_nodes_true = p(X_nodes, Y_nodes);
+    error_p_nodes = norm(p_nodes_mimetic - p_nodes_true) / norm(p_nodes_true);
 
-    % Plot Numerical Vertical Fluxes
-    % figure();
-    % surf(Xdualh, Ydualh, reshape(qy_mimetic, ny+1, nx));
-    % title('Numerical vertical fluxes');
-    % xlabel('x'); ylabel('y'); colorbar;
 
-    % Plot Exact Horizontal Fluxes
-    % figure();
-    % surf(Xdualv, Ydualv, qx(Xdualv, Ydualv));
-    % title('Exact horizontal fluxes');
-    % xlabel('x'); ylabel('y'); colorbar;
 
-    % Plot Numerical Horizontal Fluxes
-    % figure();
-    % surf(Xdualv, Ydualv, reshape(qx_mimetic, ny, nx+1));
-    % title('Numerical horizontal fluxes');
-    % xlabel('x'); ylabel('y'); colorbar;
 end
+
+
+
+
+
+
+
+
