@@ -1,7 +1,8 @@
 clear all; close all;
 
-% addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
-addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
+addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
+%addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
+addpath('/Users/jvmini/Git/mimetic_a_posteriori/src')
 
 % Input data
 k = 2;
@@ -79,35 +80,49 @@ p_edges_ex_y = p_edges_ex_y(:);
 p_edges_ex = [p_edges_ex_x; p_edges_ex_y];
 error_p_edges = norm(p_edges_ex - p_edges) ./ norm(p_edges_ex)
 
-
 % Ploting
-figure();
-surf(StagX, StagY, reshape(p_num, nx+2, ny+2)');
-title('Numerical Cell-Centered Pressure');
-xlabel('x'); ylabel('y'); colorbar;
+#figure();
+#surf(StagX, StagY, reshape(p_num, nx+2, ny+2)');
+#title('Numerical Cell-Centered Pressure');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#figure();
+#surf(HoriEdgesX, HoriEdgesY, reshape(qy_num, nx, ny+1)');
+#title('Numerical Vertical Flux');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#figure();
+#surf(VertEdgesX, VertEdgesY, reshape(qx_num, nx+1, ny)');
+#title('Numerical Horizontal Flux');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#figure();
+#surf(NodesX, NodesY, reshape(p_nodes, nx+1, ny+1)');
+#title('Numerical Nodal Pressure');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#figure();
+#surf(HoriEdgesX, HoriEdgesY, reshape(p_edges_y, nx, ny+1)');
+#title('Horizontal Edge Pressure');
+#xlabel('x'); ylabel('y'); colorbar;
+#
+#figure();
+#surf(VertEdgesX, VertEdgesY, reshape(p_edges_x, nx+1, ny)');
+#title('Horizontal Edge Pressure');
+#xlabel('x'); ylabel('y'); colorbar;
 
-figure();
-surf(HoriEdgesX, HoriEdgesY, reshape(qy_num, nx, ny+1)');
-title('Numerical Vertical Flux');
-xlabel('x'); ylabel('y'); colorbar;
+% Testing Q1 reconstruction
+p_cc_matrix = reshape(p_num, nx+2, ny+2)';
+p_nodes_matrix = reshape(p_nodes, nx+1, ny+1)';
+A = q1_reconstruction(NodesX, NodesY, p_nodes_matrix);
+test_q1_reconstruction_nodal_values(NodesX, NodesY, p_nodes_matrix);
 
-figure();
-surf(VertEdgesX, VertEdgesY, reshape(qx_num, nx+1, ny)');
-title('Numerical Horizontal Flux');
-xlabel('x'); ylabel('y'); colorbar;
+% plot_q1_vs_mimetic(StagX, StagY, p_cc_matrix, NodesX, NodesY, p_nodes_matrix)
+convergence_q1_reconstruction(StagX, StagY, p_cc_matrix, NodesX, NodesY, p_nodes_matrix)
 
-figure();
-surf(NodesX, NodesY, reshape(p_nodes, nx+1, ny+1)');
-title('Numerical Nodal Pressure');
-xlabel('x'); ylabel('y'); colorbar;
 
-figure();
-surf(HoriEdgesX, HoriEdgesY, reshape(p_edges_y, nx, ny+1)');
-title('Horizontal Edge Pressure');
-xlabel('x'); ylabel('y'); colorbar;
+%test_q1_reconstruction_cell_center_eval(NodesX, NodesY, p_nodes_matrix, ...
+%                                       StagX, StagY, p_cc_matrix);
 
-figure();
-surf(VertEdgesX, VertEdgesY, reshape(p_edges_x, nx+1, ny)');
-title('Horizontal Edge Pressure');
-xlabel('x'); ylabel('y'); colorbar;
+
 
