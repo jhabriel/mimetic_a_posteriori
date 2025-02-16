@@ -1,4 +1,4 @@
-function A = Q1_reconstruction(X_nodes, Y_nodes, U_nodes)
+function A = q1_reconstruction(X_nodes, Y_nodes, U_nodes)
   % Q1 reconstruction for a Cartesian grid using nodal values
   %
   % INPUT:
