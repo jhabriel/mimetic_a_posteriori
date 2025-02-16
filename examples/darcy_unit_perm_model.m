@@ -53,11 +53,15 @@ function [errors] = darcy_unit_perm_model(num_cells, k)
     % Compute nodal pressures
     p_nodes = cell_centered_pressure_to_nodes(k, [nx, ny], p_num);
 
+
     % Compute errors
+
+    % Compute errors at cell centers
     p_ex = p(StagX, StagY)';
     p_ex = p_ex(:);
     error_p_cc = norm(p_num - p_ex) ./ norm(p_ex);
 
+    % Compute fluxe errors
     q_ex_x = qx(VertEdgesX, VertEdgesY)';
     q_ex_x = q_ex_x(:);
     q_ex_y = qy(HoriEdgesX, HoriEdgesY)';
@@ -65,10 +69,12 @@ function [errors] = darcy_unit_perm_model(num_cells, k)
     q_ex = [q_ex_x; q_ex_y];
     error_q = norm(q_num - q_ex) ./ norm(q_ex);
 
+    % Compute errors at nodes
     p_nodes_ex = p(NodesX, NodesY)';
     p_nodes_ex = p_nodes_ex(:);
     error_p_nodes = norm(p_nodes - p_nodes_ex) ./ norm(p_nodes_ex);
 
+    % Compute errors at edges
     p_edges_ex_x = p(VertEdgesX, VertEdgesY)';
     p_edges_ex_x = p_edges_ex_x(:);
     p_edges_ex_y = p(HoriEdgesX, HoriEdgesY)';
