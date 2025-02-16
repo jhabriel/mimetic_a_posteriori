@@ -1,25 +1,25 @@
-function [error_p, error_p_nodes] = darcy_unit_perm_model(ncells, k)
+function [errors] = darcy_unit_perm_model(num_cells, k)
     % Model implementation of Darcy problem with unit permeability
 
-    % addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
-    addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
+    addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
+    % addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
 
-    % Input parameters
-    % ncells = 40;  % number of cells in x and y directions
-    % k = 2;  % degree of the mimetic operator
+    % Domain
+    domain = [0, 1, 0, 1];
 
-    % True solution
+    % Construct grids
+    nx = num_cells; ny = num_cells;
+    [dx, dy] = step_size_2d([nx, ny], domain);
+    [StagX, StagY] = staggered_grid_2d([dx, dy], domain);
+    [HoriEdgesX, HoriEdgesY] = horizontal_edges_grid_2d([dx, dy], domain);
+    [VertEdgesX, VertEdgesY] = vertical_edges_grid_2d([dx, dy], domain);
+    [NodesX, NodesY] = nodes_grid_2d([dx, dy], domain);
+
+    % Exact solution
     p  = @(x, y) sin(pi*x) .* sin(pi*y);
     qx = @(x, y) -pi * cos(pi*x) .* sin(pi*y);
     qy = @(x, y) -pi * sin(pi*x) .* cos(pi*y);
     f  = @(x, y) 2*pi*pi*sin(pi*x) .* sin(pi*y);
-
-    % Domain's limits
-    west = 0; east = 1; south = 0; north = 1;
-
-    % Number of cells and step size
-    nx = ncells; dx = (east-west)/nx;
-    ny = ncells; dy = (north-south)/ny;
 
     % 2D Mimetic laplacian operator
     L = lap2D(k, nx, dx, ny, dy);
@@ -28,74 +28,60 @@ function [error_p, error_p_nodes] = darcy_unit_perm_model(ncells, k)
     a = 1; b = 0;
     L = L + robinBC2D(k, nx, dx, ny, dy, a, b);
 
-    % Construct the staggered grid
-    x_grid = [west west+dx/2 : dx : east-dx/2 east];
-    y_grid = [south south+dy/2 : dy : north-dy/2 north];
-    [X, Y] = meshgrid(x_grid, y_grid);
+    % Exact source term at each cell-center
+    source = f(StagX, StagY);
 
-    % Exact source term in each cell-center
-    source = f(X, Y);
-
-    % Assemble RHS and Enforce zero BC.
+    % Assemble RHS and enforce zero BC.
     RHS = source;
-    RHS(1, :) = 0;
-    RHS(end, :) = 0;
-    RHS(:, 1) = 0;
-    RHS(:, end) = 0;
-    RHS = reshape(RHS, [], 1);
+    RHS([1, end], :) = 0;
+    RHS(:, [1, end]) = 0;
+    RHS = reshape(RHS', [], 1);
 
     % Solve linear system to obtain mimetic pressure
-    p_mimetic = -L\RHS;
+    p_num = -L\RHS;
 
-    % Retrieve mimetic flux solution
+    % Retrieve flux solution
     G = grad2D(k, nx, dx, ny, dy);
-    q_mimetic = - G * p_mimetic;
+    q_num = - G * p_num;
+    qx_num = q_num(1:((nx+1)*ny));
+    qy_num = q_num((nx+1)*ny+1:end);
 
-    % Now, we separate between horizontal and vertical edges
-    %x_hori_edges = west + dx/2 : dx : east - dx/2;
-    %y_hori_edges = south : dy : north;
-    %[X_hori_edges, Y_hori_edges] = meshgrid(x_hori_edges, y_hori_edges);
-    %q_hori_edges = q_mimetic(1:end/2);
+    % Compute edge pressures
+    [p_edges_y, p_edges_x] = cell_centered_pressure_to_edges(k, [nx, ny], p_num);
+    p_edges = [p_edges_x; p_edges_y];
 
-    %x_vert_edges = west : dx : east;
-    %y_vert_edges = south + dy/2 : dy : north - dy/2;
-    %[X_vert_edges, Y_vert_edges] = meshgrid(x_vert_edges, y_vert_edges);
-    %q_vert_edges = q_mimetic(end/2+1:end);
+    % Compute nodal pressures
+    p_nodes = cell_centered_pressure_to_nodes(k, [nx, ny], p_num);
 
-    % Exact pressure and flux values
-    p_exact = p(X, Y);
-    p_exact = p_exact(:);
+    % Compute errors
+    p_ex = p(StagX, StagY)';
+    p_ex = p_ex(:);
+    error_p_cc = norm(p_num - p_ex) ./ norm(p_ex);
 
-    %q_vert_edges_exact = qx(X_vert_edges, Y_vert_edges);  % vert edges, x-component
-    %q_vert_edges_exact = q_vert_edges_exact(:);
-    %q_hori_edges_exact = qy(X_hori_edges, X_hori_edges);  % hori edges, y-component
-    %q_hori_edges_exact = q_hori_edges_exact(:);
-    %q_exact = [q_vert_edges_exact; q_hori_edges_exact];   % [qx, qy] --> makes sense
+    q_ex_x = qx(VertEdgesX, VertEdgesY)';
+    q_ex_x = q_ex_x(:);
+    q_ex_y = qy(HoriEdgesX, HoriEdgesY)';
+    q_ex_y = q_ex_y(:);
+    q_ex = [q_ex_x; q_ex_y];
+    error_q = norm(q_num - q_ex) ./ norm(q_ex);
 
-    % Error computation
-    error_p = norm(p_mimetic - p_exact) / norm(p_exact);
-    %error_q = norm(q_mimetic - q_exact) / norm(q_exact);
-    %disp('Error Pressure'); disp(error_p);
-    %disp('Error Flux'); disp(error_q);
+    p_nodes_ex = p(NodesX, NodesY)';
+    p_nodes_ex = p_nodes_ex(:);
+    error_p_nodes = norm(p_nodes - p_nodes_ex) ./ norm(p_nodes_ex);
 
-    % Postprocessing
+    p_edges_ex_x = p(VertEdgesX, VertEdgesY)';
+    p_edges_ex_x = p_edges_ex_x(:);
+    p_edges_ex_y = p(HoriEdgesX, HoriEdgesY)';
+    p_edges_ex_y = p_edges_ex_y(:);
+    p_edges_ex = [p_edges_ex_x; p_edges_ex_y];
+    error_p_edges = norm(p_edges_ex - p_edges) ./ norm(p_edges_ex);
 
-    # --> Center to faces interpolators
-    %C2F = interpolCentersToFacesD2D(k, ncells, ncells);
-    %p_faces = C2F * [p_mimetic; p_mimetic];
-    %p_vert_edges = p_faces(1:end/2);
-    %p_hori_edges = p_faces(end/2+1:end);
-
-    # --> Center to nodes interpolators
-    x_nodes = west:dx:east;
-    y_nodes = south:dy:north;
-    [X_nodes, Y_nodes] = meshgrid(x_nodes, y_nodes);
-    C2N = interpolCentersToNodes2D(k, ncells, ncells);
-    p_nodes_mimetic = C2N * p_mimetic;
-    p_nodes_true = p(X_nodes, Y_nodes);
-    error_p_nodes = norm(p_nodes_mimetic - p_nodes_true) / norm(p_nodes_true);
-
-
+    % Create struct
+    errors = struct(...
+        'p_cell_centers', error_p_cc, ...
+        'p_nodes', error_p_nodes, ...
+        'p_edge_centers', error_p_edges, ...
+        'q_edge_centers', error_q);
 
 end
 
