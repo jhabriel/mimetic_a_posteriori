@@ -1,31 +1,28 @@
-graphics_toolkit("qt");
+clear all; close all;
 
-% This code implements the Darcy problem with unit permeability using
-% a trigonometric manufactured solution satisfying zero-boundary conditions
+% addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
+addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
 
-% Clear and add path
-clear all; clc; close all;
-addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
-addpath('/Users/jvmini/Git/mimetic_a_posteriori/src')
+% Input data
+k = 2;
+nx = 8;
+ny = 10;
 
-% addpath('/Users/jvpro/Documents/GitHub/mole/src/MATLAB')
+% Domain
+domain = [0, 1, 0, 1];
 
-% Input parameters
-ncells = 20;  % number of cells in x and y directions
-k = 2;  % degree of the mimetic operator
+% Construct grids
+[dx, dy] = step_size_2d([nx, ny], domain);
+[StagX, StagY] = staggered_grid_2d([dx, dy], domain);
+[HoriEdgesX, HoriEdgesY] = horizontal_edges_grid_2d([dx, dy], domain);
+[VertEdgesX, VertEdgesY] = vertical_edges_grid_2d([dx, dy], domain);
+[NodesX, NodesY] = nodes_grid_2d([dx, dy], domain);
 
-% True solution
+% Exact solution
 p  = @(x, y) sin(pi*x) .* sin(pi*y);
 qx = @(x, y) -pi * cos(pi*x) .* sin(pi*y);
 qy = @(x, y) -pi * sin(pi*x) .* cos(pi*y);
 f  = @(x, y) 2*pi*pi*sin(pi*x) .* sin(pi*y);
-
-% Domain's limits
-west = 0; east = 1; south = 0; north = 1;
-
-% Number of cells and step size
-nx = ncells; dx = (east-west)/nx;
-ny = ncells; dy = (north-south)/ny;
 
 % 2D Mimetic laplacian operator
 L = lap2D(k, nx, dx, ny, dy);
@@ -34,122 +31,83 @@ L = lap2D(k, nx, dx, ny, dy);
 a = 1; b = 0;
 L = L + robinBC2D(k, nx, dx, ny, dy, a, b);
 
-% Construct the staggered grid
-x_grid = [west west+dx/2 : dx : east-dx/2 east];
-y_grid = [south south+dy/2 : dy : north-dy/2 north];
-[X, Y] = meshgrid(x_grid, y_grid);
+% Exact source term at each cell-center
+source = f(StagX, StagY);
 
-% Exact source term in each cell-center
-source = f(X, Y);
-
-% Assemble RHS and Enforce zero BC.
+% Assemble RHS and enforce zero BC.
 RHS = source;
-RHS(1, :) = 0;
-RHS(end, :) = 0;
-RHS(:, 1) = 0;
-RHS(:, end) = 0;
-RHS = reshape(RHS, [], 1);
+RHS([1, end], :) = 0;
+RHS(:, [1, end]) = 0;
+RHS = reshape(RHS', [], 1);
 
-% Solve linear system
-p_mimetic = -L\RHS;
+% Solve linear system to obtain mimetic pressure
+p_num = -L\RHS;
 
 % Retrieve flux solution
 G = grad2D(k, nx, dx, ny, dy);
-q_mimetic = - G * p_mimetic;
+q_num = - G * p_num;
+qx_num = q_num(1:((nx+1)*ny));
+qy_num = q_num((nx+1)*ny+1:end);
 
-% Grid for vertical and horizontal fluxes
-x_dual_grid_h = west + dx/2 : dx : east - dx/2;
-y_dual_grid_h = south : dy : north;
-[Xdualh, Ydualh] = meshgrid(x_dual_grid_h, y_dual_grid_h);
-qy_mimetic = q_mimetic(1:length(q_mimetic)/2);
+% Compute edge pressures
+[p_edges_y, p_edges_x] = cell_centered_pressure_to_edges(k, [nx, ny], p_num);
+p_edges = [p_edges_x; p_edges_y];
 
-x_dual_grid_v = west : dx : east;
-y_dual_grid_v = south + dy/2 : dy : north - dy/2;
-[Xdualv, Ydualv] = meshgrid(x_dual_grid_v, y_dual_grid_v);
-qx_mimetic = q_mimetic(length(q_mimetic)/2+1:end);
+% Compute nodal pressures
+p_nodes = cell_centered_pressure_to_nodes(k, [nx, ny], p_num);
 
-% Exact values pressure and flux values
-p_exact = p(X, Y);
-p_exact = p_exact(:);
+% Compute errors
+p_ex = p(StagX, StagY)';
+p_ex = p_ex(:);
+error_p_cc = norm(p_num - p_ex) ./ norm(p_ex)
 
-qx_exact = qx(Xdualv, Ydualv);
-qx_exact = qx_exact(:);
-qy_exact = qy(Xdualh, Ydualh);
-qy_exact = qy_exact(:);
-q_exact = [qy_exact; qx_exact];
+q_ex_x = qx(VertEdgesX, VertEdgesY)';
+q_ex_x = q_ex_x(:);
+q_ex_y = qy(HoriEdgesX, HoriEdgesY)';
+q_ex_y = q_ex_y(:);
+q_ex = [q_ex_x; q_ex_y];
+error_q = norm(q_num - q_ex) ./ norm(q_ex)
 
-% Error computation
-error_p = norm(p_mimetic - p_exact) / norm(p_exact);
-error_q = norm(q_mimetic - q_exact) / norm(q_exact);
-disp('Error Pressure'); disp(error_p);
-disp('Error Flux'); disp(error_q);
+p_nodes_ex = p(NodesX, NodesY)';
+p_nodes_ex = p_nodes_ex(:);
+error_p_nodes = norm(p_nodes - p_nodes_ex) ./ norm(p_nodes_ex)
 
-#% Plot Numerical Pressure
-#figure();
-#surf(X, Y, reshape(p_mimetic, nx+2, ny+2));
-#title(['Numerical pressure, k=', num2str(k)]);
-#xlabel('x'); ylabel('y'); colorbar;
-#
-#% Plot Exact Pressure
-#figure();
-#surf(X, Y, p(X, Y));
-#title('Exact pressure');
-#xlabel('x'); ylabel('y'); colorbar;
-#
-#% Plot Exact Vertical Fluxes
-#figure();
-#surf(Xdualh, Ydualh, qy(Xdualh, Ydualh));
-#title('Exact vertical fluxes');
-#xlabel('x'); ylabel('y'); colorbar;
-#
-#% Plot Numerical Vertical Fluxes
-#figure();
-#surf(Xdualh, Ydualh, reshape(qy_mimetic, ny+1, nx));
-#title('Numerical vertical fluxes');
-#xlabel('x'); ylabel('y'); colorbar;
-#
-#% Plot Exact Horizontal Fluxes
-#figure();
-#surf(Xdualv, Ydualv, qx(Xdualv, Ydualv));
-#title('Exact horizontal fluxes');
-#xlabel('x'); ylabel('y'); colorbar;
-#
-#% Plot Numerical Horizontal Fluxes
-#figure();
-#surf(Xdualv, Ydualv, reshape(qx_mimetic, ny, nx+1));
-#title('Numerical horizontal fluxes');
-#xlabel('x'); ylabel('y'); colorbar;
+p_edges_ex_x = p(VertEdgesX, VertEdgesY)';
+p_edges_ex_x = p_edges_ex_x(:);
+p_edges_ex_y = p(HoriEdgesX, HoriEdgesY)';
+p_edges_ex_y = p_edges_ex_y(:);
+p_edges_ex = [p_edges_ex_x; p_edges_ex_y];
+error_p_edges = norm(p_edges_ex - p_edges) ./ norm(p_edges_ex)
 
 
-# Testing interpolators
-
-# --> Center to faces interpolators
-
-C2F = interpolCentersToFacesD2D(k, ncells, ncells);
-p_faces = C2F * [p_mimetic; p_mimetic];
-p_vertical_edges = p_faces(end/2+1:end);
-p_horizontal_edges = p_faces(1:end/2);
-
-# Pressure at the vertical edges
-#figure();
-#surf(Xdualv, Ydualv, reshape(p_vertical_edges, ny, nx+1));
-#title('Pressure at vertical edges')
-
-#figure();
-#surf(Xdualh, Ydualh, reshape(p_horizontal_edges, ny+1, nx));
-#title('Pressure at horizontal edges')
-
-# --> Center to nodes interpolators
-x_nodes = west:dx:east;
-y_nodes = south:dy:north;
-[X_nodes, Y_nodes] = meshgrid(x_nodes, y_nodes);
-C2N = interpolCentersToNodes2D(k, ncells, ncells);
-p_nodes = C2N * p_mimetic;
+% Ploting
 figure();
-surf(X_nodes, Y_nodes, reshape(p_nodes, nx+1, ny+1));
+surf(StagX, StagY, reshape(p_num, nx+2, ny+2)');
+title('Numerical Cell-Centered Pressure');
+xlabel('x'); ylabel('y'); colorbar;
 
+figure();
+surf(HoriEdgesX, HoriEdgesY, reshape(qy_num, nx, ny+1)');
+title('Numerical Vertical Flux');
+xlabel('x'); ylabel('y'); colorbar;
 
+figure();
+surf(VertEdgesX, VertEdgesY, reshape(qx_num, nx+1, ny)');
+title('Numerical Horizontal Flux');
+xlabel('x'); ylabel('y'); colorbar;
 
+figure();
+surf(NodesX, NodesY, reshape(p_nodes, nx+1, ny+1)');
+title('Numerical Nodal Pressure');
+xlabel('x'); ylabel('y'); colorbar;
 
+figure();
+surf(HoriEdgesX, HoriEdgesY, reshape(p_edges_y, nx, ny+1)');
+title('Horizontal Edge Pressure');
+xlabel('x'); ylabel('y'); colorbar;
 
+figure();
+surf(VertEdgesX, VertEdgesY, reshape(p_edges_x, nx+1, ny)');
+title('Horizontal Edge Pressure');
+xlabel('x'); ylabel('y'); colorbar;
 
