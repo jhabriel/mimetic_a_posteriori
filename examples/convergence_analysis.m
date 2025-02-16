@@ -8,13 +8,15 @@ errors_p_cell_centers = zeros(length(ncells), 1);
 errors_p_edge_centers = zeros(length(ncells), 1);
 errors_p_nodes = zeros(length(ncells), 1);
 errors_q_edge_centers = zeros(length(ncells), 1);
+errors_p_q1 = zeros(length(ncells), 1);
 
 for ii=1:length(ncells)
-    errors = darcy_unit_perm_model(ncells(ii), 2);
+    errors = darcy_unit_perm_with_q1(ncells(ii), 2);
     errors_p_cell_centers(ii) = errors.p_cell_centers;
     errors_p_edge_centers(ii) = errors.p_edge_centers;
     errors_p_nodes(ii) = errors.p_nodes;
     errors_q_edge_centers(ii) = errors.q_edge_centers;
+    errors_p_q1(ii) = errors.p_q1_L2;
 end
 
 % Compute log values for plotting
@@ -23,6 +25,7 @@ log_errors_p_cell_centers = log2(errors_p_cell_centers);
 log_errors_p_edge_centers = log2(errors_p_edge_centers);
 log_errors_p_nodes = log2(errors_p_nodes);
 log_errors_q_edge_centers = log2(errors_q_edge_centers);
+log_errors_p_q1 = log2(errors_p_q1);
 
 % Plot errors
 figure();
@@ -31,6 +34,7 @@ hold on;
 plot(log_ncells, log_errors_p_edge_centers, '-ob', 'LineWidth', 1.5);
 plot(log_ncells, log_errors_p_nodes, '-og', 'LineWidth', 1.5);
 plot(log_ncells, log_errors_q_edge_centers, '-om', 'LineWidth', 1.5);
+plot(log_ncells, log_errors_p_q1, '-ok', 'LineWidth', 1.5);
 
 % -----> Choose your custom first y-point for the second-order reference slope
 y_start = -10;  % Change this to any desired starting y-point
@@ -49,6 +53,7 @@ legend({'Pressure (cell-center)', ...
         'Pressure (edge-center)', ...
         'Pressure (node)', ...
         'Flux (edge-center)', ...
+        'Pressures (Q1)', ...
         'Reference slope 2'}, 'Location', 'Best', 'FontSize', 15);
 
 grid on;
