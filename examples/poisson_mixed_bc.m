@@ -6,72 +6,84 @@
 
 % Clear and add path
 clear all; clc; close all;
-addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
+%addpath('/Users/jvmini/Git/mole-master/src/mole_MATLAB')
+addpath('/Users/jvpro/Documents/GitHub/mole/src/matlab')
 
-% Set domain's limits
-left   = 0;
-right  = 1;
-bottom = 0;
-top    = 1;
-
-m = 8;
-n = 10;
-dx = (right - left) / m;
-dy = (top - bottom) / n;
+% Set domain's and create relevant grids
+domain = [0, 1, 0, 1]; % xmin, xmax, ymin, ymax
+nx = 8; ny = 10;
+[dx, dy] = step_size_2d([nx, ny], domain);
+[StagX, StagY] = staggered_grid_2d([dx, dy], domain);
+[HoriEdgesX, HoriEdgesY] = horizontal_edges_grid_2d([dx, dy], domain);
+[VertEdgesX, VertEdgesY] = vertical_edges_grid_2d([dx, dy], domain);
+[NodesX, NodesY] = nodes_grid_2d([dx, dy], domain);
 
 %  Construct Laplacian operator
 k = 2;
-L = lap2D(k, m, dx, n, dy);
+L = lap2D(k, nx, dx, ny, dy);
 
 % Set up mixed_bc boundary
 mixed_bc = mixedBC2D(k,  ...
-                     m,  dx, ...
-                     n,  dy, ...
-                     "Robin", [1, 0], ...  % Dirichlet on the left side
-                     "Robin", [1, 0], ...  % Dirichlet on the right side
-                     "Robin", [0, 1], ...  % Neumann on the bottom side
-                     "Robin", [0, 1]);     % Neumann on the top side
+                     nx,  dx, ...
+                     ny,  dy, ...
+                     "Dirichlet", 1, ...  % Dirichlet on the left side
+                     "Dirichlet", 1, ...  % Dirichlet on the right side
+                     "Neumann", 1, ...  % Neumann on the bottom side
+                     "Neumann", 1);     % Neumann on the top side
 
 % Update Laplacian to account for boundary conditions
 L = L + mixed_bc;
 
 % Assemble RHS and solve
 
-b = zeros(m+2, n+2)';
-b(:, 1) = 100;  % known value at the left boundary
+b = zeros(nx+2, ny+2)';
+b(2:end-1, 1) = 1;  % known value at the left boundary
+% Note that we do not include the corner points here, otherwise we get
+% the wrong values.
+
 b = reshape(b', [], 1);
 
 p = L \ b;
 
 % Plot Numerical Pressure
 
-% Construct staggered grid
-x_grid = [left left+dx/2 : dx : right-dx/2 right];
-y_grid = [bottom bottom+dy/2 : dy : top-dy/2 top];
-[X, Y] = meshgrid(x_grid, y_grid);
-
 % Plot
 figure();
-surf(X, Y, reshape(p, m+2, n+2)');
+surf(StagX, StagY, reshape(p, nx+2, ny+2)');
 title(['Numerical pressure, k=', num2str(k)]);
 xlabel('x'); ylabel('y'); colorbar;
 
 % Retrieve flux solution
-G = grad2D(k, m, dx, n, dy);
+G = grad2D(k, nx, dx, ny, dy);
 q = - G * p;
+qx = q(1:((nx+1)*ny));
+qy = q((nx+1)*ny+1:end);
 
-% Grid for vertical and horizontal fluxes
-x_dual_grid_h = left + dx/2 : dx : right - dx/2;
-y_dual_grid_h = bottom : dy : top;
-[Xdualh, Ydualh] = meshgrid(x_dual_grid_h, y_dual_grid_h);
-qy = q(1:length(q)/2);
+% Plot horizontal and vertical fluxes
+figure();
+surf(HoriEdgesX, HoriEdgesY, reshape(qy, nx, ny+1)');
+title('Vertical Flux'); colorbar;
 
-x_dual_grid_v = left : dx : right;
-y_dual_grid_v = bottom + dy/2 : dy : top - dy/2;
-[Xdualv, Ydualv] = meshgrid(x_dual_grid_v, y_dual_grid_v);
-qx = q(length(q)/2+1:end);
+figure();
+surf(VertEdgesX, VertEdgesY, reshape(qx, nx+1, ny)');
+title('Horizontal Flux'); colorbar;
 
+% Nodal interpolation
+p_nodes = cell_centered_pressure_to_nodes(k, [nx, ny], p);
+figure();
+surf(NodesX, NodesY, reshape(p_nodes, nx+1, ny+1)');
+title('Nodal pressures')
 
+% Face pressures
+[p_hori_edges, p_vert_edges] = cell_centered_pressure_to_edges(k, [nx, ny], p);
+
+figure();
+surf(HoriEdgesX, HoriEdgesY, reshape(p_hori_edges, nx, ny+1)');
+title('Horizontal Edges Pressure');
+
+figure();
+surf(VertEdgesX, VertEdgesY, reshape(p_vert_edges, nx+1, ny)');
+title('Vertical Edges Pressure');
 
 
 
